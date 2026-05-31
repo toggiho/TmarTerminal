@@ -39,6 +39,7 @@
 - Ping активного SSH-подключения в статус-баре.
 - Настройки тем терминала, размера шрифта и хоткеев.
 - Темный компактный UI в стиле desktop terminal tooling.
+<img width="1275" height="796" alt="изображение" src="https://github.com/user-attachments/assets/dc005f80-45e1-4e16-82b2-90ee9c61a665" />
 
 ### Установка
 
