@@ -4,7 +4,9 @@ mod sshconfig;
 
 use pty::PtyManager;
 use serde::{Deserialize, Serialize};
-use ssh::{AuthMethod, ConnectionParams, PingResult, SftpEntry, SshManager};
+use ssh::{
+    AuthMethod, ConnectionParams, PingResult, PortForwardInfo, RemoteService, SftpEntry, SshManager,
+};
 use std::fs;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -337,6 +339,52 @@ async fn sftp_download(
         .map_err(|e| e.to_string())
 }
 
+// ── Port forwarding ───────────────────────────────────────────────────────────
+
+#[tauri::command]
+async fn port_forward_start(
+    state: State<'_, AppState>,
+    session_id: String,
+    local_port: u16,
+    remote_host: String,
+    remote_port: u16,
+) -> Result<String, String> {
+    state
+        .ssh
+        .port_forward_start(&session_id, local_port, remote_host, remote_port)
+        .await
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+async fn port_forward_stop(
+    state: State<'_, AppState>,
+    forward_id: String,
+) -> Result<(), String> {
+    state.ssh.port_forward_stop(&forward_id).await;
+    Ok(())
+}
+
+#[tauri::command]
+async fn port_forward_list(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<Vec<PortForwardInfo>, String> {
+    Ok(state.ssh.port_forward_list(&session_id).await)
+}
+
+#[tauri::command]
+async fn scan_remote_ports(
+    state: State<'_, AppState>,
+    session_id: String,
+) -> Result<Vec<RemoteService>, String> {
+    state
+        .ssh
+        .scan_remote_ports(&session_id)
+        .await
+        .map_err(|e| e.to_string())
+}
+
 // ── Saved connections ─────────────────────────────────────────────────────────
 
 #[tauri::command]
@@ -444,6 +492,10 @@ pub fn run() {
             save_connection,
             delete_connection,
             import_ssh_config,
+            port_forward_start,
+            port_forward_stop,
+            port_forward_list,
+            scan_remote_ports,
         ])
         .run(tauri::generate_context!())
         .expect("error while running TmarTerminal");

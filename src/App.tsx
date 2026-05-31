@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import { FolderSync, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
+import { ArrowRightLeft, FolderSync, SplitSquareHorizontal, SplitSquareVertical, X } from "lucide-react";
 import { TitleBar } from "./components/TitleBar";
 import { Sidebar } from "./components/Sidebar";
 import { Terminal } from "./components/Terminal";
@@ -10,6 +10,7 @@ import { WelcomeScreen } from "./components/WelcomeScreen";
 import { LocalPanel } from "./components/LocalPanel";
 import { PaneLauncher } from "./components/PaneLauncher";
 import { SftpPanel } from "./components/SftpPanel";
+import { PortForwardModal } from "./components/PortForwardModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { useStore } from "./store/useStore";
 import { ConnectFormData, PaneLayout, SavedConnection, Tab, TerminalPane } from "./types";
@@ -83,6 +84,7 @@ export default function App() {
   const [splitTarget, setSplitTarget] = useState<SplitTarget | null>(null);
   const [pingLabel, setPingLabel] = useState("-- ms");
   const [sftpSessionId, setSftpSessionId] = useState<string | null>(null);
+  const [portForwardSessionId, setPortForwardSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
   const activeTab = useMemo(
@@ -349,13 +351,22 @@ export default function App() {
             <SplitSquareVertical size={13} />
           </button>
           {pane.type === "ssh" && pane.status === "connected" && (
-            <button
-              onClick={() => setSftpSessionId(pane.sessionId)}
-              title="Open SFTP (Ctrl+Shift+S)"
-              className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-accent-cyan border border-border"
-            >
-              <FolderSync size={13} />
-            </button>
+            <>
+              <button
+                onClick={() => setSftpSessionId(pane.sessionId)}
+                title="Open SFTP (Ctrl+Shift+S)"
+                className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-accent-cyan border border-border"
+              >
+                <FolderSync size={13} />
+              </button>
+              <button
+                onClick={() => setPortForwardSessionId(pane.sessionId)}
+                title="Port forwarding"
+                className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-accent-purple border border-border"
+              >
+                <ArrowRightLeft size={13} />
+              </button>
+            </>
           )}
           <button
             onClick={closeActivePane}
@@ -465,6 +476,11 @@ export default function App() {
       <SftpPanel
         sessionId={sftpSessionId}
         onClose={() => setSftpSessionId(null)}
+      />
+
+      <PortForwardModal
+        sessionId={portForwardSessionId}
+        onClose={() => setPortForwardSessionId(null)}
       />
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
