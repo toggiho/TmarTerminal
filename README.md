@@ -36,6 +36,7 @@
 - Вкладки и split-панели внутри одной вкладки.
 - Локальный PowerShell рядом с SSH-сессиями.
 - Встроенный SFTP: локальная и удаленная панели, upload/download, mkdir/delete/rename.
+- Проброс портов: форвардинг `localhost:port` → удаленный хост через SSH, сканирование слушающих сервисов на сервере и форвардинг в один клик.
 - Ping активного SSH-подключения в статус-баре.
 - Настройки тем терминала, размера шрифта и хоткеев.
 - Темный компактный UI в стиле desktop terminal tooling.
@@ -46,8 +47,8 @@
 Скачай последнюю сборку в разделе **Releases**:
 
 - `TmarTerminal-portable.exe` — portable-версия.
-- `TmarTerminal_0.1.0_x64-setup.exe` — обычный Windows installer.
-- `TmarTerminal_0.1.0_x64_en-US.msi` — MSI installer.
+- `TmarTerminal_0.2.0_x64-setup.exe` — обычный Windows installer.
+- `TmarTerminal_0.2.0_x64_en-US.msi` — MSI installer.
 
 ### Разработка
 
@@ -87,6 +88,7 @@ npm run tauri build
 - Tabs and split panes inside a single tab.
 - Local PowerShell panes next to SSH sessions.
 - Built-in SFTP: local and remote panels, upload/download, mkdir/delete/rename.
+- SSH port forwarding: forward `localhost:port` to a remote host over SSH, scan the server for listening services, and forward them with one click.
 - Active SSH round-trip ping in the status bar.
 - Configurable terminal themes, font size, and hotkeys.
 - Compact dark UI designed for repeated terminal work.
@@ -96,8 +98,8 @@ npm run tauri build
 Download the latest build from **Releases**:
 
 - `TmarTerminal-portable.exe` — portable executable.
-- `TmarTerminal_0.1.0_x64-setup.exe` — Windows installer.
-- `TmarTerminal_0.1.0_x64_en-US.msi` — MSI installer.
+- `TmarTerminal_0.2.0_x64-setup.exe` — Windows installer.
+- `TmarTerminal_0.2.0_x64_en-US.msi` — MSI installer.
 
 ### Development
 
@@ -137,6 +139,7 @@ npm run tauri build
 - 支持标签页和同一标签页内的分屏面板。
 - 支持在 SSH 会话旁边打开本地 PowerShell。
 - 内置 SFTP：本地/远程双面板、上传/下载、创建目录、删除、重命名。
+- SSH 端口转发：通过 SSH 将 `localhost:port` 转发到远程主机，扫描服务器上的监听服务并一键转发。
 - 状态栏显示当前 SSH 连接的 round-trip ping。
 - 支持配置终端主题、字体大小和快捷键。
 - 深色紧凑界面，适合高频终端操作。
@@ -146,8 +149,8 @@ npm run tauri build
 请在 **Releases** 页面下载最新版本：
 
 - `TmarTerminal-portable.exe` — 便携版可执行文件。
-- `TmarTerminal_0.1.0_x64-setup.exe` — Windows 安装器。
-- `TmarTerminal_0.1.0_x64_en-US.msi` — MSI 安装器。
+- `TmarTerminal_0.2.0_x64-setup.exe` — Windows 安装器。
+- `TmarTerminal_0.2.0_x64_en-US.msi` — MSI 安装器。
 
 ### 开发
 
