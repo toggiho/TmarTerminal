@@ -1,6 +1,6 @@
 [package]
 name = "tmar-terminal"
-version = "0.1.0"
+version = "0.2.0"
 description = "TmarTerminal - Modern SSH Terminal for Windows"
 authors = ["vlama"]
 edition = "2021"
