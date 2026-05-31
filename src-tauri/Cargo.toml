@@ -1,0 +1,35 @@
+[package]
+name = "tmar-terminal"
+version = "0.1.0"
+description = "TmarTerminal - Modern SSH Terminal for Windows"
+authors = ["vlama"]
+edition = "2021"
+
+[lib]
+name = "tmar_terminal_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = ["tray-icon"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+russh = "0.44"
+russh-keys = "0.44"
+russh-sftp = "2.0.0-beta.2"
+tokio = { version = "1", features = ["full"] }
+uuid = { version = "1", features = ["v4"] }
+async-trait = "0.1"
+log = "0.4"
+dirs = "6"
+anyhow = "1"
+portable-pty = "0.8"
+
+[profile.release]
+panic = "abort"
+codegen-units = 1
+lto = true
+opt-level = "s"
+strip = true
