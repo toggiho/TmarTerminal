@@ -23,6 +23,8 @@ const HOTKEY_LABELS: Array<[keyof HotkeySettings, string]> = [
   ["openSftp", "Open SFTP"],
   ["focusPreviousPane", "Focus previous pane"],
   ["focusNextPane", "Focus next pane"],
+  ["commandPalette", "Command palette"],
+  ["reconnectLast", "Reconnect last"],
 ];
 
 export function SettingsModal({ open, onClose }: SettingsModalProps) {

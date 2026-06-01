@@ -5,6 +5,27 @@ All notable changes to TmarTerminal are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.0] - 2026-06-01
+
+### Added
+- **Command Palette.** Added a global command palette for quickly opening
+  actions, saved connections, recent sessions, and SSH snippets from one place.
+- **Recent sessions and quick reconnect.** The sidebar and welcome screen now
+  show recently used hosts, and the app can reconnect the latest session with a
+  dedicated hotkey.
+- **Per-pane activity indicators.** Tabs and panes now show unread terminal
+  output and clearer connection state, making background sessions easier to
+  monitor.
+- **SSH snippets.** Saved connections can now store reusable commands and run
+  them directly in an active SSH pane.
+- **Port forward dashboard.** Active tunnels are now visible in a persistent
+  side dashboard with refresh, copy, and stop controls.
+
+### Changed
+- **Release polish.** Version metadata has been bumped to `0.3.0` across the
+  frontend and Tauri manifests, and the release notes/install references have
+  been updated for the new build.
+
 ## [0.2.0] - 2026-05-31
 
 ### Added
@@ -34,3 +55,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 [0.2.0]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.1.0
+[0.3.0]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.3.0

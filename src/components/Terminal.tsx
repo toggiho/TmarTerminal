@@ -25,7 +25,7 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
   const isActiveRef = useRef(isActive);
   const unlistenData = useRef<UnlistenFn | null>(null);
   const unlistenClose = useRef<UnlistenFn | null>(null);
-  const { updatePane, settings } = useStore();
+  const { updatePane, settings, touchPaneActivity } = useStore();
 
   const dataEvent = type === "ssh" ? `ssh_data_${sessionId}` : `pty_data_${sessionId}`;
   const closeEvent = type === "ssh" ? `ssh_closed_${sessionId}` : `pty_closed_${sessionId}`;
@@ -75,6 +75,7 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
     const setup = async () => {
       unlistenData.current = await listen<number[]>(dataEvent, (e) => {
         term.write(new Uint8Array(e.payload));
+        touchPaneActivity(tabId, paneId);
       });
       unlistenClose.current = await listen(closeEvent, () => {
         term.writeln("\r\n\x1b[33mSession closed.\x1b[0m");
@@ -100,7 +101,7 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
       unlistenClose.current?.();
       term.dispose();
     };
-  }, [sessionId]);
+  }, [paneId, sessionId, tabId, touchPaneActivity, type, updatePane, sendCmd, dataEvent, closeEvent, handleResize, settings.fontSize, settings.terminalTheme]);
 
   useEffect(() => {
     if (!xtermRef.current) return;

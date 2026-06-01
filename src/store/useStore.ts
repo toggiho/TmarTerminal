@@ -1,6 +1,43 @@
 import { create } from "zustand";
-import { AppSettings, PaneLayout, SavedConnection, Tab, TerminalPane } from "../types";
+import { AppSettings, PaneLayout, PortForwardRecord, RecentConnection, SavedConnection, Tab, TerminalPane } from "../types";
 import { DEFAULT_SETTINGS, loadSettings, saveSettings } from "../settings";
+
+const SIDEBAR_WIDTH_KEY = "tmar-terminal-sidebar-width";
+const RECENT_CONNECTIONS_KEY = "tmar-terminal-recents";
+const DEFAULT_SIDEBAR_WIDTH = 220;
+const MIN_SIDEBAR_WIDTH = 180;
+const MAX_SIDEBAR_WIDTH = 420;
+const MAX_RECENTS = 8;
+
+function loadSidebarWidth() {
+  try {
+    const raw = localStorage.getItem(SIDEBAR_WIDTH_KEY);
+    const value = raw ? Number(raw) : DEFAULT_SIDEBAR_WIDTH;
+    if (!Number.isFinite(value)) return DEFAULT_SIDEBAR_WIDTH;
+    return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, value));
+  } catch {
+    return DEFAULT_SIDEBAR_WIDTH;
+  }
+}
+
+function saveSidebarWidth(width: number) {
+  localStorage.setItem(SIDEBAR_WIDTH_KEY, String(width));
+}
+
+function loadRecentConnections() {
+  try {
+    const raw = localStorage.getItem(RECENT_CONNECTIONS_KEY);
+    if (!raw) return [] as RecentConnection[];
+    const parsed = JSON.parse(raw) as RecentConnection[];
+    return Array.isArray(parsed) ? parsed.slice(0, MAX_RECENTS) : [];
+  } catch {
+    return [] as RecentConnection[];
+  }
+}
+
+function saveRecentConnections(recents: RecentConnection[]) {
+  localStorage.setItem(RECENT_CONNECTIONS_KEY, JSON.stringify(recents.slice(0, MAX_RECENTS)));
+}
 
 function collectPaneIds(layout: PaneLayout): string[] {
   if (layout.type === "leaf") return [layout.paneId];
@@ -47,8 +84,11 @@ interface Store {
   activeTabId: string | null;
   savedConnections: SavedConnection[];
   sidebarOpen: boolean;
+  sidebarWidth: number;
   localPanelOpen: boolean;
   settings: AppSettings;
+  recentConnections: RecentConnection[];
+  portForwards: PortForwardRecord[];
 
   addTab: (pane: TerminalPane) => string;
   addPaneToTab: (
@@ -66,9 +106,14 @@ interface Store {
   toggleMaximizedPane: () => void;
   setSavedConnections: (connections: SavedConnection[]) => void;
   toggleSidebar: () => void;
+  setSidebarWidth: (width: number) => void;
   toggleLocalPanel: () => void;
   updateSettings: (updates: Partial<AppSettings>) => void;
   resetSettings: () => void;
+  addRecentConnection: (connection: Omit<RecentConnection, "lastConnectedAt">) => void;
+  setPaneUnread: (tabId: string, paneId: string, unread: boolean) => void;
+  touchPaneActivity: (tabId: string, paneId: string) => void;
+  setPortForwards: (forwards: PortForwardRecord[]) => void;
 }
 
 export const useStore = create<Store>((set) => ({
@@ -76,8 +121,11 @@ export const useStore = create<Store>((set) => ({
   activeTabId: null,
   savedConnections: [],
   sidebarOpen: true,
+  sidebarWidth: loadSidebarWidth(),
   localPanelOpen: false,
   settings: loadSettings(),
+  recentConnections: loadRecentConnections(),
+  portForwards: [],
 
   addTab: (pane) => {
     const tabId = pane.id;
@@ -166,12 +214,33 @@ export const useStore = create<Store>((set) => ({
       return { tabs: newTabs, activeTabId: newActive };
     }),
 
-  setActiveTab: (id) => set({ activeTabId: id }),
+  setActiveTab: (id) =>
+    set((s) => ({
+      activeTabId: id,
+      tabs: s.tabs.map((tab) => (
+        tab.id === id
+          ? {
+              ...tab,
+              panes: tab.panes.map((pane) => (
+                pane.id === tab.activePaneId ? { ...pane, hasUnreadOutput: false } : pane
+              )),
+            }
+          : tab
+      )),
+    })),
 
   setActivePane: (tabId, paneId) =>
     set((s) => ({
       activeTabId: tabId,
-      tabs: s.tabs.map((tab) => (tab.id === tabId ? { ...tab, activePaneId: paneId } : tab)),
+      tabs: s.tabs.map((tab) => (
+        tab.id === tabId
+          ? {
+              ...tab,
+              activePaneId: paneId,
+              panes: tab.panes.map((pane) => (pane.id === paneId ? { ...pane, hasUnreadOutput: false } : pane)),
+            }
+          : tab
+      )),
     })),
 
   focusNextPane: (direction) =>
@@ -197,6 +266,12 @@ export const useStore = create<Store>((set) => ({
 
   setSavedConnections: (connections) => set({ savedConnections: connections }),
   toggleSidebar: () => set((s) => ({ sidebarOpen: !s.sidebarOpen })),
+  setSidebarWidth: (width) =>
+    set(() => {
+      const next = Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)));
+      saveSidebarWidth(next);
+      return { sidebarWidth: next };
+    }),
   toggleLocalPanel: () => set((s) => ({ localPanelOpen: !s.localPanelOpen })),
   updateSettings: (updates) =>
     set((s) => {
@@ -214,4 +289,39 @@ export const useStore = create<Store>((set) => ({
       saveSettings(next);
       return { settings: next };
     }),
+  addRecentConnection: (connection) =>
+    set((s) => {
+      const next = [
+        { ...connection, lastConnectedAt: Date.now() },
+        ...s.recentConnections.filter((item) => (
+          item.connectionId ? item.connectionId !== connection.connectionId : `${item.username}@${item.host}:${item.port}` !== `${connection.username}@${connection.host}:${connection.port}`
+        )),
+      ].slice(0, MAX_RECENTS);
+      saveRecentConnections(next);
+      return { recentConnections: next };
+    }),
+  setPaneUnread: (tabId, paneId, unread) =>
+    set((s) => ({
+      tabs: s.tabs.map((tab) => (
+        tab.id === tabId
+          ? { ...tab, panes: tab.panes.map((pane) => (pane.id === paneId ? { ...pane, hasUnreadOutput: unread } : pane)) }
+          : tab
+      )),
+    })),
+  touchPaneActivity: (tabId, paneId) =>
+    set((s) => ({
+      tabs: s.tabs.map((tab) => (
+        tab.id === tabId
+          ? {
+              ...tab,
+              panes: tab.panes.map((pane) => (
+                pane.id === paneId
+                  ? { ...pane, lastActivityAt: Date.now(), hasUnreadOutput: tab.activePaneId === paneId && s.activeTabId === tabId ? false : true }
+                  : pane
+              )),
+            }
+          : tab
+      )),
+    })),
+  setPortForwards: (portForwards) => set({ portForwards }),
 }));

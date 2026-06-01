@@ -7,6 +7,14 @@ export interface SavedConnection {
   auth_type: "password" | "key";
   key_path?: string;
   password?: string;
+  snippets?: ConnectionSnippet[];
+}
+
+export interface ConnectionSnippet {
+  id: string;
+  name: string;
+  command: string;
+  autoEnter?: boolean;
 }
 
 export interface TerminalPane {
@@ -16,6 +24,10 @@ export interface TerminalPane {
   host?: string;
   status: "connecting" | "connected" | "disconnected" | "error";
   type: "ssh" | "local";
+  connectionId?: string;
+  hasUnreadOutput?: boolean;
+  lastActivityAt?: number;
+  lastError?: string;
 }
 
 export type PaneLayout =
@@ -46,6 +58,7 @@ export interface ConnectFormData {
   targetTabId?: string;
   targetPaneId?: string;
   splitDirection?: "horizontal" | "vertical";
+  snippets?: ConnectionSnippet[];
 }
 
 export type TerminalThemeName = "github-dark" | "dracula" | "nord" | "solarized-dark";
@@ -65,10 +78,34 @@ export interface HotkeySettings {
   openSftp: string;
   focusPreviousPane: string;
   focusNextPane: string;
+  commandPalette: string;
+  reconnectLast: string;
 }
 
 export interface AppSettings {
   terminalTheme: TerminalThemeName;
   fontSize: number;
   hotkeys: HotkeySettings;
+}
+
+export interface RecentConnection {
+  id: string;
+  name: string;
+  host: string;
+  port: number;
+  username: string;
+  auth_type: "password" | "key";
+  key_path?: string;
+  password?: string;
+  connectionId?: string;
+  lastConnectedAt: number;
+}
+
+export interface PortForwardRecord {
+  id: string;
+  sessionId: string;
+  sessionLabel: string;
+  localPort: number;
+  remoteHost: string;
+  remotePort: number;
 }

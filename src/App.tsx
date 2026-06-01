@@ -12,8 +12,10 @@ import { PaneLauncher } from "./components/PaneLauncher";
 import { SftpPanel } from "./components/SftpPanel";
 import { PortForwardModal } from "./components/PortForwardModal";
 import { SettingsModal } from "./components/SettingsModal";
+import { CommandPalette, CommandPaletteAction } from "./components/CommandPalette";
+import { PortForwardDashboard } from "./components/PortForwardDashboard";
 import { useStore } from "./store/useStore";
-import { ConnectFormData, PaneLayout, SavedConnection, Tab, TerminalPane } from "./types";
+import { ConnectFormData, PortForwardRecord, RecentConnection, SavedConnection, Tab, TerminalPane } from "./types";
 import { v4 } from "./utils/uuid";
 import { isHotkey } from "./settings";
 
@@ -35,6 +37,13 @@ interface PaneRect {
   height: number;
 }
 
+interface ForwardInfo {
+  id: string;
+  local_port: number;
+  remote_host: string;
+  remote_port: number;
+}
+
 function isInputTarget(target: EventTarget | null) {
   const el = target as HTMLElement | null;
   return !!el?.closest("input, textarea, select, [contenteditable='true'], [data-hotkeys='ignore']");
@@ -44,7 +53,7 @@ function getPane(tab: Tab, paneId: string) {
   return tab.panes.find((pane) => pane.id === paneId) ?? tab.panes[0];
 }
 
-function getPaneRects(layout: PaneLayout, bounds = { left: 0, top: 0, width: 100, height: 100 }): PaneRect[] {
+function getPaneRects(layout: Tab["layout"], bounds = { left: 0, top: 0, width: 100, height: 100 }): PaneRect[] {
   if (layout.type === "leaf") return [{ paneId: layout.paneId, ...bounds }];
 
   if (layout.direction === "horizontal") {
@@ -60,11 +69,38 @@ function getPaneRects(layout: PaneLayout, bounds = { left: 0, top: 0, width: 100
   ];
 }
 
+function toRecentConnection(connection: SavedConnection): Omit<RecentConnection, "lastConnectedAt"> {
+  return {
+    id: connection.id,
+    name: connection.name || `${connection.username}@${connection.host}`,
+    host: connection.host,
+    port: connection.port,
+    username: connection.username,
+    auth_type: connection.auth_type,
+    key_path: connection.key_path,
+    password: connection.password,
+    connectionId: connection.id,
+  };
+}
+
+function normalizeConnection(connection: SavedConnection): SavedConnection {
+  return {
+    ...connection,
+    snippets: (connection.snippets ?? []).map((snippet: any) => ({
+      id: snippet.id,
+      name: snippet.name,
+      command: snippet.command,
+      autoEnter: snippet.autoEnter ?? snippet.auto_enter ?? false,
+    })),
+  };
+}
+
 export default function App() {
   const {
     tabs,
     activeTabId,
     savedConnections,
+    recentConnections,
     setSavedConnections,
     removeTab,
     removePane,
@@ -78,6 +114,9 @@ export default function App() {
     toggleLocalPanel,
     localPanelOpen,
     settings,
+    addRecentConnection,
+    setPortForwards,
+    portForwards,
   } = useStore();
   const [modalOpen, setModalOpen] = useState(false);
   const [modalPrefill, setModalPrefill] = useState<Partial<ConnectFormData> | undefined>();
@@ -86,6 +125,8 @@ export default function App() {
   const [sftpSessionId, setSftpSessionId] = useState<string | null>(null);
   const [portForwardSessionId, setPortForwardSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [paletteOpen, setPaletteOpen] = useState(false);
+  const [portDashboardOpen, setPortDashboardOpen] = useState(true);
 
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId),
@@ -93,11 +134,37 @@ export default function App() {
   );
   const activePane = activeTab ? getPane(activeTab, activeTab.activePaneId) : undefined;
 
+  const refreshPortForwards = useCallback(async () => {
+    const sshPanes = tabs.flatMap((tab) => tab.panes.filter((pane) => pane.type === "ssh" && pane.status === "connected"));
+    const records = await Promise.all(
+      sshPanes.map(async (pane) => {
+        try {
+          const list = await invoke<ForwardInfo[]>("port_forward_list", { sessionId: pane.sessionId });
+          return list.map<PortForwardRecord>((forward) => ({
+            id: forward.id,
+            sessionId: pane.sessionId,
+            sessionLabel: pane.title,
+            localPort: forward.local_port,
+            remoteHost: forward.remote_host,
+            remotePort: forward.remote_port,
+          }));
+        } catch {
+          return [];
+        }
+      }),
+    );
+    setPortForwards(records.flat());
+  }, [setPortForwards, tabs]);
+
   useEffect(() => {
     invoke<SavedConnection[]>("get_connections")
-      .then(setSavedConnections)
+      .then((connections) => setSavedConnections(connections.map(normalizeConnection)))
       .catch(console.error);
   }, [setSavedConnections]);
+
+  useEffect(() => {
+    refreshPortForwards().catch(console.error);
+  }, [refreshPortForwards]);
 
   const openModal = useCallback((prefill?: Partial<ConnectFormData>) => {
     setModalPrefill(prefill);
@@ -112,7 +179,15 @@ export default function App() {
     const sessionId = v4();
     const paneId = v4();
     const title = conn.name || `${conn.username}@${conn.host}`;
-    const pane: TerminalPane = { id: paneId, sessionId, title, host: conn.host, status: "connecting", type: "ssh" };
+    const pane: TerminalPane = {
+      id: paneId,
+      sessionId,
+      title,
+      host: conn.host,
+      status: "connecting",
+      type: "ssh",
+      connectionId: conn.id,
+    };
     const tabId = target?.tabId ?? paneId;
 
     if (target) addPaneToTab(target.tabId, target.paneId, pane, target.direction);
@@ -126,12 +201,18 @@ export default function App() {
         username: conn.username,
         auth,
       });
-      updatePane(tabId, paneId, { status: "connected" });
+      updatePane(tabId, paneId, { status: "connected", lastError: undefined });
+      addRecentConnection(toRecentConnection(conn));
+      refreshPortForwards().catch(console.error);
     } catch (err) {
-      updatePane(tabId, paneId, { status: "error", title: `Error: ${conn.host}` });
+      updatePane(tabId, paneId, {
+        status: "error",
+        title: conn.name || `${conn.username}@${conn.host}`,
+        lastError: String(err),
+      });
       console.error(err);
     }
-  }, [addPaneToTab, addTab, updatePane]);
+  }, [addPaneToTab, addRecentConnection, addTab, refreshPortForwards, updatePane]);
 
   const startLocalPane = useCallback(async (target?: SplitTarget) => {
     const sessionId = v4();
@@ -151,7 +232,7 @@ export default function App() {
       await invoke("local_start", { sessionId });
       updatePane(tabId, paneId, { status: "connected" });
     } catch (err) {
-      updatePane(tabId, paneId, { status: "error", title: "PowerShell error" });
+      updatePane(tabId, paneId, { status: "error", title: "PowerShell error", lastError: String(err) });
       console.error(err);
     }
   }, [addPaneToTab, addTab, updatePane]);
@@ -181,6 +262,22 @@ export default function App() {
     }
   }, [openModal, startSshSession]);
 
+  const handleReconnect = useCallback(async (conn: RecentConnection, target?: SplitTarget) => {
+    const saved = conn.connectionId ? savedConnections.find((item) => item.id === conn.connectionId) : undefined;
+    const merged: SavedConnection = saved ?? {
+      id: conn.connectionId ?? conn.id,
+      name: conn.name,
+      host: conn.host,
+      port: conn.port,
+      username: conn.username,
+      auth_type: conn.auth_type,
+      key_path: conn.key_path,
+      password: conn.password,
+      snippets: [],
+    };
+    await handleDirectConnect(merged, target);
+  }, [handleDirectConnect, savedConnections]);
+
   const handleEditConnection = useCallback((conn: SavedConnection) => {
     openModal({
       _editId: conn.id,
@@ -192,8 +289,93 @@ export default function App() {
       password: conn.password ?? "",
       savePassword: !!conn.password,
       keyPath: conn.key_path ?? "",
+      snippets: conn.snippets ?? [],
     });
   }, [openModal]);
+
+  const activeConnection = useMemo(
+    () => savedConnections.find((connection) => connection.id === activePane?.connectionId),
+    [activePane?.connectionId, savedConnections],
+  );
+
+  const runSnippet = useCallback((command: string, autoEnter?: boolean) => {
+    if (!activePane || activePane.type !== "ssh" || activePane.status !== "connected") return;
+    const payload = `${command}${autoEnter ? "\r" : ""}`;
+    invoke("ssh_send_data", { sessionId: activePane.sessionId, data: Array.from(new TextEncoder().encode(payload)) }).catch(console.error);
+  }, [activePane]);
+
+  const paletteActions = useMemo<CommandPaletteAction[]>(() => {
+    const actions: CommandPaletteAction[] = [
+      {
+        id: "new-connection",
+        label: "New SSH connection",
+        group: "Actions",
+        hotkey: settings.hotkeys.newTab,
+        icon: "command",
+        onSelect: () => openModal(),
+      },
+      {
+        id: "new-local",
+        label: "New local PowerShell pane",
+        group: "Actions",
+        icon: "terminal",
+        onSelect: () => startLocalPane(),
+      },
+      {
+        id: "settings",
+        label: "Open settings",
+        group: "Actions",
+        icon: "command",
+        onSelect: () => setSettingsOpen(true),
+      },
+      {
+        id: "import-ssh-config",
+        label: "Import ~/.ssh/config",
+        group: "Actions",
+        icon: "command",
+        onSelect: async () => {
+          const updated = await invoke<SavedConnection[]>("import_ssh_config");
+          setSavedConnections(updated.map(normalizeConnection));
+        },
+      },
+    ];
+
+    recentConnections.forEach((connection) => {
+      actions.push({
+        id: `recent-${connection.id}`,
+        label: `Reconnect ${connection.name}`,
+        subtitle: `${connection.username}@${connection.host}:${connection.port}`,
+        group: "Recent",
+        icon: "history",
+        onSelect: () => { handleReconnect(connection).catch(console.error); },
+      });
+    });
+
+    savedConnections.forEach((connection) => {
+      actions.push({
+        id: `saved-${connection.id}`,
+        label: connection.name,
+        subtitle: `${connection.username}@${connection.host}:${connection.port}`,
+        group: "Connections",
+        icon: "server",
+        keywords: [connection.host, connection.username],
+        onSelect: () => { handleDirectConnect(connection).catch(console.error); },
+      });
+    });
+
+    (activeConnection?.snippets ?? []).forEach((snippet) => {
+      actions.push({
+        id: `snippet-${snippet.id}`,
+        label: `Run ${snippet.name}`,
+        subtitle: snippet.command,
+        group: "Snippets",
+        icon: "terminal",
+        onSelect: () => runSnippet(snippet.command, snippet.autoEnter),
+      });
+    });
+
+    return actions;
+  }, [activeConnection?.snippets, handleDirectConnect, handleReconnect, openModal, recentConnections, runSnippet, savedConnections, setSavedConnections, settings.hotkeys.newTab, startLocalPane]);
 
   const openSplitLauncher = useCallback((direction: "horizontal" | "vertical") => {
     const tab = useStore.getState().tabs.find((item) => item.id === useStore.getState().activeTabId);
@@ -212,7 +394,8 @@ export default function App() {
     if (pane.type === "ssh") invoke("ssh_disconnect", { sessionId: pane.sessionId }).catch(console.error);
     else invoke("local_close", { sessionId: pane.sessionId }).catch(console.error);
     removePane(tab.id, pane.id);
-  }, [removePane]);
+    refreshPortForwards().catch(console.error);
+  }, [refreshPortForwards, removePane]);
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
@@ -220,6 +403,14 @@ export default function App() {
       if (isHotkey(e, settings.hotkeys.newTab)) {
         e.preventDefault();
         openModal();
+      }
+      if (isHotkey(e, settings.hotkeys.commandPalette)) {
+        e.preventDefault();
+        setPaletteOpen(true);
+      }
+      if (isHotkey(e, settings.hotkeys.reconnectLast)) {
+        e.preventDefault();
+        if (recentConnections[0]) handleReconnect(recentConnections[0]).catch(console.error);
       }
       if (isHotkey(e, settings.hotkeys.toggleSidebar)) {
         e.preventDefault();
@@ -231,12 +422,12 @@ export default function App() {
       }
       if (isHotkey(e, settings.hotkeys.nextTab) || isHotkey(e, settings.hotkeys.previousTab)) {
         e.preventDefault();
-        const { activeTabId, tabs } = useStore.getState();
-        if (tabs.length < 2) return;
-        const current = Math.max(0, tabs.findIndex((tab) => tab.id === activeTabId));
+        const { activeTabId: currentId, tabs: currentTabs } = useStore.getState();
+        if (currentTabs.length < 2) return;
+        const current = Math.max(0, currentTabs.findIndex((tab) => tab.id === currentId));
         const direction = isHotkey(e, settings.hotkeys.previousTab) ? -1 : 1;
-        const next = (current + direction + tabs.length) % tabs.length;
-        setActiveTab(tabs[next].id);
+        const next = (current + direction + currentTabs.length) % currentTabs.length;
+        setActiveTab(currentTabs[next].id);
       }
       if (isHotkey(e, settings.hotkeys.splitRight)) {
         e.preventDefault();
@@ -272,14 +463,17 @@ export default function App() {
       }
       if (isHotkey(e, settings.hotkeys.closeTab)) {
         e.preventDefault();
-        const { activeTabId, tabs } = useStore.getState();
-        const tab = tabs.find((item) => item.id === activeTabId);
+        const { activeTabId: currentId, tabs: currentTabs } = useStore.getState();
+        const tab = currentTabs.find((item) => item.id === currentId);
         if (!tab) return;
         Promise.all(
           tab.panes.map((pane) =>
             invoke(pane.type === "ssh" ? "ssh_disconnect" : "local_close", { sessionId: pane.sessionId }).catch(console.error),
           ),
-        ).finally(() => removeTab(tab.id));
+        ).finally(() => {
+          removeTab(tab.id);
+          refreshPortForwards().catch(console.error);
+        });
       }
     };
     window.addEventListener("keydown", handler);
@@ -287,8 +481,11 @@ export default function App() {
   }, [
     closeActivePane,
     focusNextPane,
+    handleReconnect,
     openModal,
     openSplitLauncher,
+    recentConnections,
+    refreshPortForwards,
     removeTab,
     setActiveTab,
     settings.hotkeys,
@@ -335,70 +532,92 @@ export default function App() {
         }}
         onMouseDown={() => setActivePane(tab.id, pane.id)}
       >
-        <div className="absolute right-2 top-2 z-10 flex items-center gap-1 opacity-0 group-hover:opacity-100 focus-within:opacity-100">
-          <button
-            onClick={() => openSplitLauncher("horizontal")}
-            title="Split right (Ctrl+Shift+D)"
-            className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-text-primary border border-border"
-          >
-            <SplitSquareHorizontal size={13} />
-          </button>
-          <button
-            onClick={() => openSplitLauncher("vertical")}
-            title="Split down (Ctrl+Shift+E)"
-            className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-text-primary border border-border"
-          >
-            <SplitSquareVertical size={13} />
-          </button>
-          {pane.type === "ssh" && pane.status === "connected" && (
-            <>
-              <button
-                onClick={() => setSftpSessionId(pane.sessionId)}
-                title="Open SFTP (Ctrl+Shift+S)"
-                className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-accent-cyan border border-border"
-              >
-                <FolderSync size={13} />
-              </button>
-              <button
-                onClick={() => setPortForwardSessionId(pane.sessionId)}
-                title="Port forwarding"
-                className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-accent-purple border border-border"
-              >
-                <ArrowRightLeft size={13} />
-              </button>
-            </>
+        <div className="absolute inset-x-0 top-0 z-10 flex h-7 items-center gap-2 border-b border-border/70 bg-bg-surface/90 px-2 text-[11px] backdrop-blur-sm">
+          <span className={`h-1.5 w-1.5 rounded-full ${
+            pane.status === "connected" ? "bg-success" :
+            pane.status === "connecting" ? "bg-warning animate-pulse" :
+            pane.status === "error" ? "bg-error" : "bg-text-muted"
+          }`} />
+          <span className="truncate text-text-primary">{pane.title}</span>
+          {pane.host && <span className="truncate text-text-muted">{pane.host}</span>}
+          {pane.hasUnreadOutput && !active && <span className="h-2 w-2 rounded-full bg-accent-cyan" title="New output" />}
+          {pane.status === "error" && pane.lastError && (
+            <span className="truncate text-error">{pane.lastError}</span>
           )}
-          <button
-            onClick={closeActivePane}
-            title="Close pane (Ctrl+Shift+W)"
-            className="p-1 rounded bg-bg-surface/90 text-text-muted hover:text-error border border-border"
-          >
-            <X size={13} />
-          </button>
+          <div className="ml-auto flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100 focus-within:opacity-100">
+            <button
+              onClick={() => openSplitLauncher("horizontal")}
+              title="Split right (Ctrl+Shift+D)"
+              className="rounded border border-border bg-bg-surface/90 p-1 text-text-muted hover:text-text-primary"
+            >
+              <SplitSquareHorizontal size={13} />
+            </button>
+            <button
+              onClick={() => openSplitLauncher("vertical")}
+              title="Split down (Ctrl+Shift+E)"
+              className="rounded border border-border bg-bg-surface/90 p-1 text-text-muted hover:text-text-primary"
+            >
+              <SplitSquareVertical size={13} />
+            </button>
+            {pane.type === "ssh" && pane.status === "connected" && (
+              <>
+                <button
+                  onClick={() => setSftpSessionId(pane.sessionId)}
+                  title="Open SFTP (Ctrl+Shift+S)"
+                  className="rounded border border-border bg-bg-surface/90 p-1 text-text-muted hover:text-accent-cyan"
+                >
+                  <FolderSync size={13} />
+                </button>
+                <button
+                  onClick={() => setPortForwardSessionId(pane.sessionId)}
+                  title="Port forwarding"
+                  className="rounded border border-border bg-bg-surface/90 p-1 text-text-muted hover:text-accent-purple"
+                >
+                  <ArrowRightLeft size={13} />
+                </button>
+              </>
+            )}
+            <button
+              onClick={closeActivePane}
+              title="Close pane (Ctrl+Shift+W)"
+              className="rounded border border-border bg-bg-surface/90 p-1 text-text-muted hover:text-error"
+            >
+              <X size={13} />
+            </button>
+          </div>
         </div>
-        <Terminal
-          sessionId={pane.sessionId}
-          tabId={tab.id}
-          paneId={pane.id}
-          isActive={active}
-          type={pane.type}
-        />
+        <div className="h-full pt-7">
+          <Terminal
+            sessionId={pane.sessionId}
+            tabId={tab.id}
+            paneId={pane.id}
+            isActive={active}
+            type={pane.type}
+          />
+        </div>
       </div>
     );
   };
 
   return (
-    <div className="flex flex-col h-screen w-screen bg-bg-base overflow-hidden font-sans">
-      <TitleBar onNewTab={() => openModal()} onOpenSettings={() => setSettingsOpen(true)} />
+    <div className="flex h-screen w-screen flex-col overflow-hidden bg-bg-base font-sans">
+      <TitleBar
+        onNewTab={() => openModal()}
+        onOpenSettings={() => setSettingsOpen(true)}
+        onOpenPalette={() => setPaletteOpen(true)}
+        onTogglePortDashboard={() => setPortDashboardOpen((value) => !value)}
+        portDashboardOpen={portDashboardOpen}
+      />
 
-      <div className="flex flex-1 min-h-0">
+      <div className="flex min-h-0 flex-1">
         <Sidebar
           onNewConnection={() => openModal()}
           onDirectConnect={handleDirectConnect}
           onEdit={handleEditConnection}
+          onReconnect={handleReconnect}
         />
 
-        <main className="flex-1 min-w-0 relative bg-bg-base">
+        <main className="relative flex-1 min-w-0 bg-bg-base">
           {tabs.map((tab) => (
             <div
               key={tab.id}
@@ -413,29 +632,39 @@ export default function App() {
               })}
             </div>
           ))}
-          {tabs.length === 0 && <WelcomeScreen onNewConnection={() => openModal()} />}
+          {tabs.length === 0 && (
+            <WelcomeScreen
+              onNewConnection={() => openModal()}
+              recentConnections={recentConnections}
+              onReconnect={handleReconnect}
+            />
+          )}
         </main>
+
+        {portDashboardOpen && (
+          <PortForwardDashboard forwards={portForwards} onRefresh={() => refreshPortForwards().catch(console.error)} />
+        )}
 
         <AnimatePresence>
           {localPanelOpen && <LocalPanel key="local-panel" />}
         </AnimatePresence>
       </div>
 
-      <div className="flex items-center h-6 px-4 bg-bg-surface border-t border-border shrink-0">
+      <div className="flex h-6 shrink-0 items-center border-t border-border bg-bg-surface px-4">
         <div className="flex items-center gap-4 text-[11px] text-text-muted">
           {!activePane ? (
             <span>TmarTerminal - Ready</span>
           ) : (
             <>
               <span className="flex items-center gap-1.5">
-                <span className={`w-1.5 h-1.5 rounded-full ${
+                <span className={`h-1.5 w-1.5 rounded-full ${
                   activePane.status === "connected" ? "bg-success" :
                   activePane.status === "connecting" ? "bg-warning animate-pulse" :
                   activePane.status === "error" ? "bg-error" : "bg-text-muted"
                 }`} />
                 {activePane.status === "connected" ? `Connected - ${activePane.host ?? activePane.title}` :
                  activePane.status === "connecting" ? `Connecting to ${activePane.host ?? activePane.title}...` :
-                 activePane.status === "error" ? `Connection failed - ${activePane.host ?? activePane.title}` : "Disconnected"}
+                 activePane.status === "error" ? activePane.lastError ?? `Connection failed - ${activePane.host ?? activePane.title}` : "Disconnected"}
               </span>
               <span className="opacity-30">|</span>
               <span>{activePane.title}</span>
@@ -444,6 +673,7 @@ export default function App() {
         </div>
         <div className="ml-auto flex items-center gap-4 text-[11px] text-text-muted">
           <span>Ping: {pingLabel}</span>
+          <span>{portForwards.length} tunnels</span>
           <span>{tabs.length} {tabs.length === 1 ? "tab" : "tabs"}</span>
         </div>
       </div>
@@ -480,14 +710,22 @@ export default function App() {
 
       <PortForwardModal
         sessionId={portForwardSessionId}
-        onClose={() => setPortForwardSessionId(null)}
+        onChanged={() => refreshPortForwards().catch(console.error)}
+        onClose={() => {
+          setPortForwardSessionId(null);
+          refreshPortForwards().catch(console.error);
+        }}
       />
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
+      <CommandPalette open={paletteOpen} actions={paletteActions} onClose={() => setPaletteOpen(false)} />
 
       <ConnectModal
         open={modalOpen}
-        onClose={() => setModalOpen(false)}
+        onClose={() => {
+          setModalOpen(false);
+          invoke<SavedConnection[]>("get_connections").then((connections) => setSavedConnections(connections.map(normalizeConnection))).catch(console.error);
+        }}
         prefill={modalPrefill}
       />
     </div>

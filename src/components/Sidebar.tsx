@@ -1,13 +1,27 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { invoke } from "@tauri-apps/api/core";
-import { Server, Plus, Trash2, ChevronRight, Key, Lock, Settings, Download } from "lucide-react";
+import { Server, Plus, Trash2, ChevronRight, Key, Lock, Settings, Download, History } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useStore } from "../store/useStore";
-import { SavedConnection } from "../types";
+import { RecentConnection, SavedConnection } from "../types";
 
 interface SidebarProps {
   onNewConnection: () => void;
   onDirectConnect: (conn: SavedConnection) => void;
   onEdit: (conn: SavedConnection) => void;
+  onReconnect: (conn: RecentConnection) => void;
+}
+
+function normalizeConnections(connections: SavedConnection[]) {
+  return connections.map((connection: any) => ({
+    ...connection,
+    snippets: (connection.snippets ?? []).map((snippet: any) => ({
+      id: snippet.id,
+      name: snippet.name,
+      command: snippet.command,
+      autoEnter: snippet.autoEnter ?? snippet.auto_enter ?? false,
+    })),
+  }));
 }
 
 function ConnectionItem({
@@ -65,30 +79,64 @@ function ConnectionItem({
   );
 }
 
-export function Sidebar({ onNewConnection, onDirectConnect, onEdit }: SidebarProps) {
-  const { savedConnections, setSavedConnections, sidebarOpen } = useStore();
+export function Sidebar({ onNewConnection, onDirectConnect, onEdit, onReconnect }: SidebarProps) {
+  const { savedConnections, setSavedConnections, sidebarOpen, sidebarWidth, setSidebarWidth, recentConnections } = useStore();
+  const [isResizing, setIsResizing] = useState(false);
+  const startXRef = useRef(0);
+  const startWidthRef = useRef(sidebarWidth);
 
   const handleDelete = async (id: string) => {
     if (!window.confirm("Delete this saved connection?")) return;
     await invoke("delete_connection", { id });
     const updated = await invoke<SavedConnection[]>("get_connections");
-    setSavedConnections(updated);
+    setSavedConnections(normalizeConnections(updated));
   };
 
   const handleImportSshConfig = async () => {
     const updated = await invoke<SavedConnection[]>("import_ssh_config");
-    setSavedConnections(updated);
+    setSavedConnections(normalizeConnections(updated));
   };
+
+  const handleResizeStart = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+    event.preventDefault();
+    event.stopPropagation();
+    startXRef.current = event.clientX;
+    startWidthRef.current = sidebarWidth;
+    setIsResizing(true);
+  }, [sidebarWidth]);
+
+  useEffect(() => {
+    if (!isResizing) return;
+
+    const handleMouseMove = (event: MouseEvent) => {
+      const delta = event.clientX - startXRef.current;
+      setSidebarWidth(startWidthRef.current + delta);
+    };
+
+    const handleMouseUp = () => setIsResizing(false);
+
+    window.addEventListener("mousemove", handleMouseMove);
+    window.addEventListener("mouseup", handleMouseUp);
+    document.body.style.cursor = "col-resize";
+    document.body.style.userSelect = "none";
+
+    return () => {
+      window.removeEventListener("mousemove", handleMouseMove);
+      window.removeEventListener("mouseup", handleMouseUp);
+      document.body.style.cursor = "";
+      document.body.style.userSelect = "";
+    };
+  }, [isResizing, setSidebarWidth]);
 
   return (
     <AnimatePresence initial={false}>
       {sidebarOpen && (
         <motion.aside
           initial={{ width: 0, opacity: 0 }}
-          animate={{ width: 220, opacity: 1 }}
+          animate={{ width: sidebarWidth, opacity: 1 }}
           exit={{ width: 0, opacity: 0 }}
           transition={{ duration: 0.2, ease: "easeInOut" }}
-          className="flex flex-col h-full bg-bg-surface border-r border-border overflow-hidden shrink-0"
+          className="relative flex flex-col h-full bg-bg-surface border-r border-border overflow-hidden shrink-0"
         >
           <div className="flex items-center justify-between px-4 py-3 border-b border-border">
             <span className="text-xs font-semibold text-text-secondary uppercase tracking-wider">
@@ -113,6 +161,29 @@ export function Sidebar({ onNewConnection, onDirectConnect, onEdit }: SidebarPro
           </div>
 
           <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+            {recentConnections.length > 0 && (
+              <div className="mb-3 border-b border-border/70 pb-3">
+                <div className="mb-2 flex items-center gap-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
+                  <History size={11} />
+                  Recent
+                </div>
+                <div className="space-y-0.5">
+                  {recentConnections.slice(0, 4).map((conn) => (
+                    <button
+                      key={conn.id}
+                      onClick={() => onReconnect(conn)}
+                      className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-left transition-all hover:bg-bg-elevated"
+                    >
+                      <div className="min-w-0">
+                        <p className="truncate text-sm text-text-primary">{conn.name}</p>
+                        <p className="truncate text-xs text-text-muted">{conn.username}@{conn.host}</p>
+                      </div>
+                      <span className="text-[11px] text-accent-cyan">Go</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
             <AnimatePresence>
               {savedConnections.length === 0 ? (
                 <motion.div
@@ -144,6 +215,16 @@ export function Sidebar({ onNewConnection, onDirectConnect, onEdit }: SidebarPro
               )}
             </AnimatePresence>
           </div>
+
+          <div
+            role="separator"
+            aria-orientation="vertical"
+            aria-label="Resize sidebar"
+            onMouseDown={handleResizeStart}
+            className={`absolute right-0 top-0 h-full w-1.5 -mr-[3px] z-20 ${
+              isResizing ? "bg-accent-cyan/40" : "bg-transparent hover:bg-accent-cyan/25"
+            } cursor-col-resize transition-colors`}
+          />
         </motion.aside>
       )}
     </AnimatePresence>

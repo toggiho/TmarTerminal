@@ -17,9 +17,10 @@ interface RemoteService {
 interface Props {
   sessionId: string | null;
   onClose: () => void;
+  onChanged?: () => void;
 }
 
-export function PortForwardModal({ sessionId, onClose }: Props) {
+export function PortForwardModal({ sessionId, onClose, onChanged }: Props) {
   const [forwards, setForwards] = useState<ForwardInfo[]>([]);
   const [services, setServices] = useState<RemoteService[]>([]);
   const [localPort, setLocalPort] = useState("8080");
@@ -63,6 +64,7 @@ export function PortForwardModal({ sessionId, onClose }: Props) {
         remotePort: rp,
       });
       await refresh();
+      onChanged?.();
     } catch (e) {
       setError(String(e));
     } finally {
@@ -84,6 +86,7 @@ export function PortForwardModal({ sessionId, onClose }: Props) {
     try {
       await invoke("port_forward_stop", { forwardId: id });
       await refresh();
+      onChanged?.();
     } catch (e) {
       console.error(e);
     }

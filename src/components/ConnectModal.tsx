@@ -4,7 +4,7 @@ import { X, Server, User, Lock, Key, ChevronDown, Loader, Wifi, Edit3 } from "lu
 import { invoke } from "@tauri-apps/api/core";
 import { v4 as uuidv4 } from "../utils/uuid";
 import { useStore } from "../store/useStore";
-import { ConnectFormData } from "../types";
+import { ConnectFormData, ConnectionSnippet } from "../types";
 
 interface ConnectModalProps {
   open: boolean;
@@ -106,19 +106,24 @@ function Checkbox({
 
 export function ConnectModal({ open, onClose, prefill }: ConnectModalProps) {
   const [form, setForm] = useState<ConnectFormData>({ ...defaultForm, ...prefill });
+  const [snippets, setSnippets] = useState<ConnectionSnippet[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { addTab, addPaneToTab, updatePane, setSavedConnections, savedConnections } = useStore();
+  const { addTab, addPaneToTab, updatePane, setSavedConnections, savedConnections, addRecentConnection } = useStore();
 
   // Reset form whenever modal opens with new prefill
   useEffect(() => {
     if (open) {
       setForm({ ...defaultForm, ...prefill });
+      setSnippets(prefill?.snippets ?? []);
       setError(null);
     }
   }, [open, prefill]);
 
   const isEditMode = !!form._editId;
+  const updateSnippet = (id: string, field: keyof ConnectionSnippet, value: string | boolean) => {
+    setSnippets((items) => items.map((item) => (item.id === id ? { ...item, [field]: value } : item)));
+  };
 
   const set = (key: keyof ConnectFormData) => (val: string) =>
     setForm((f) => ({ ...f, [key]: val }));
@@ -140,10 +145,19 @@ export function ConnectModal({ open, onClose, prefill }: ConnectModalProps) {
           auth_type: form.authType,
           key_path: form.authType === "key" ? form.keyPath : undefined,
           password: form.authType === "password" && form.savePassword ? form.password : undefined,
+          snippets: snippets.map((item) => ({ ...item, auto_enter: !!item.autoEnter })),
         };
         await invoke("save_connection", { connection: conn });
         const updated = await invoke<typeof savedConnections>("get_connections");
-        setSavedConnections(updated);
+        setSavedConnections(updated.map((connection: any) => ({
+          ...connection,
+          snippets: (connection.snippets ?? []).map((snippet: any) => ({
+            id: snippet.id,
+            name: snippet.name,
+            command: snippet.command,
+            autoEnter: snippet.autoEnter ?? snippet.auto_enter ?? false,
+          })),
+        })));
         onClose();
       } catch (err) {
         setError(String(err));
@@ -155,11 +169,22 @@ export function ConnectModal({ open, onClose, prefill }: ConnectModalProps) {
 
     // New connection mode
     const sessionId = uuidv4();
-    const tabId = form.targetTabId ?? uuidv4();
     const paneId = uuidv4();
+    const tabId = form.targetTabId ?? paneId;
     const title = form.name || `${form.username}@${form.host}`;
 
-    const pane = { id: paneId, sessionId, title, host: form.host, status: "connecting" as const, type: "ssh" as const };
+    const existing = savedConnections.find(
+      (c) => c.host === form.host && c.port === Number(form.port) && c.username === form.username
+    );
+    const pane = {
+      id: paneId,
+      sessionId,
+      title,
+      host: form.host,
+      status: "connecting" as const,
+      type: "ssh" as const,
+      connectionId: existing?.id,
+    };
     if (form.targetTabId && form.targetPaneId && form.splitDirection) {
       addPaneToTab(form.targetTabId, form.targetPaneId, pane, form.splitDirection);
     } else {
@@ -180,11 +205,19 @@ export function ConnectModal({ open, onClose, prefill }: ConnectModalProps) {
         auth,
       });
       updatePane(tabId, paneId, { status: "connected" });
+      addRecentConnection({
+        id: existing?.id ?? paneId,
+        name: form.name || title,
+        host: form.host,
+        port: Number(form.port),
+        username: form.username,
+        auth_type: form.authType,
+        key_path: form.authType === "key" ? form.keyPath : undefined,
+        password: form.authType === "password" ? form.password : undefined,
+        connectionId: existing?.id,
+      });
 
       if (form.saveConnection) {
-        const existing = savedConnections.find(
-          (c) => c.host === form.host && c.port === Number(form.port) && c.username === form.username
-        );
         const conn = {
           id: existing?.id ?? uuidv4(),
           name: form.name || title,
@@ -194,10 +227,19 @@ export function ConnectModal({ open, onClose, prefill }: ConnectModalProps) {
           auth_type: form.authType,
           key_path: form.authType === "key" ? form.keyPath : undefined,
           password: form.authType === "password" && form.savePassword ? form.password : undefined,
+          snippets: [],
         };
         await invoke("save_connection", { connection: conn });
         const updated = await invoke<typeof savedConnections>("get_connections");
-        setSavedConnections(updated);
+        setSavedConnections(updated.map((connection: any) => ({
+          ...connection,
+          snippets: (connection.snippets ?? []).map((snippet: any) => ({
+            id: snippet.id,
+            name: snippet.name,
+            command: snippet.command,
+            autoEnter: snippet.autoEnter ?? snippet.auto_enter ?? false,
+          })),
+        })));
       }
       onClose();
     } catch (err) {
@@ -365,6 +407,63 @@ export function ConnectModal({ open, onClose, prefill }: ConnectModalProps) {
                     onChange={() => setForm((f) => ({ ...f, saveConnection: !f.saveConnection }))}
                     label="Save to connections"
                   />
+                )}
+
+                {isEditMode && (
+                  <div className="space-y-2 rounded-xl border border-border bg-bg-base/60 p-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium text-text-secondary uppercase tracking-wider">
+                        SSH Snippets
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setSnippets((items) => [...items, { id: uuidv4(), name: "", command: "", autoEnter: false }])}
+                        className="text-xs text-accent-cyan hover:text-text-primary"
+                      >
+                        Add snippet
+                      </button>
+                    </div>
+                    {snippets.length === 0 ? (
+                      <p className="text-xs text-text-muted">No snippets yet.</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {snippets.map((snippet) => (
+                          <div key={snippet.id} className="rounded-lg border border-border p-2">
+                            <div className="mb-2 flex items-center gap-2">
+                              <input
+                                value={snippet.name}
+                                onChange={(e) => updateSnippet(snippet.id, "name", e.target.value)}
+                                placeholder="Snippet name"
+                                className="flex-1 rounded bg-bg-elevated px-2 py-1.5 text-sm text-text-primary outline-none"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setSnippets((items) => items.filter((item) => item.id !== snippet.id))}
+                                className="text-xs text-error"
+                              >
+                                Remove
+                              </button>
+                            </div>
+                            <textarea
+                              value={snippet.command}
+                              onChange={(e) => updateSnippet(snippet.id, "command", e.target.value)}
+                              placeholder="docker ps"
+                              rows={2}
+                              className="w-full rounded bg-bg-elevated px-2 py-1.5 text-sm text-text-primary outline-none"
+                            />
+                            <label className="mt-2 flex items-center gap-2 text-xs text-text-muted">
+                              <input
+                                type="checkbox"
+                                checked={!!snippet.autoEnter}
+                                onChange={(e) => updateSnippet(snippet.id, "autoEnter", e.target.checked)}
+                              />
+                              Send Enter automatically
+                            </label>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 )}
 
                 {error && (

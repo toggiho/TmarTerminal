@@ -58,6 +58,9 @@ export function TabBar({ onNewTab }: TabBarProps) {
                 {activePane?.title ?? tab.title}
                 {tab.panes.length > 1 ? ` (${tab.panes.length})` : ""}
               </span>
+              {tab.panes.some((pane) => pane.hasUnreadOutput) && (
+                <span className="h-2 w-2 rounded-full bg-accent-cyan shrink-0" title="New output" />
+              )}
               {activePane && <StatusIcon status={activePane.status} />}
               <button
                 onClick={(e) => handleClose(e, tab.id)}

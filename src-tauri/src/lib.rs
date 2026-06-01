@@ -24,6 +24,17 @@ pub struct SavedConnection {
     pub key_path: Option<String>,
     #[serde(default)]
     pub password: Option<String>,
+    #[serde(default)]
+    pub snippets: Vec<ConnectionSnippet>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ConnectionSnippet {
+    pub id: String,
+    pub name: String,
+    pub command: String,
+    #[serde(default)]
+    pub auto_enter: bool,
 }
 
 pub struct AppState {
@@ -449,6 +460,7 @@ async fn import_ssh_config(state: State<'_, AppState>) -> Result<Vec<SavedConnec
             },
             key_path: entry.identity_file,
             password: None,
+            snippets: Vec::new(),
         });
     }
 

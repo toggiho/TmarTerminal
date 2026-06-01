@@ -120,6 +120,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     openSftp: "Ctrl+Shift+S",
     focusPreviousPane: "Alt+ArrowLeft",
     focusNextPane: "Alt+ArrowRight",
+    commandPalette: "Ctrl+Shift+P",
+    reconnectLast: "Ctrl+Shift+R",
   },
 };
 

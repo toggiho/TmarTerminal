@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minus, Square, X, LayoutPanelLeft, TerminalSquare, Settings } from "lucide-react";
+import { Minus, Square, X, LayoutPanelLeft, TerminalSquare, Settings, Command, ArrowRightLeft } from "lucide-react";
 import { useCallback } from "react";
 import { TabBar } from "./TabBar";
 import { useStore } from "../store/useStore";
@@ -7,9 +7,12 @@ import { useStore } from "../store/useStore";
 interface TitleBarProps {
   onNewTab: () => void;
   onOpenSettings: () => void;
+  onOpenPalette: () => void;
+  onTogglePortDashboard: () => void;
+  portDashboardOpen: boolean;
 }
 
-export function TitleBar({ onNewTab, onOpenSettings }: TitleBarProps) {
+export function TitleBar({ onNewTab, onOpenSettings, onOpenPalette, onTogglePortDashboard, portDashboardOpen }: TitleBarProps) {
   const { toggleSidebar, toggleLocalPanel, localPanelOpen } = useStore();
 
   const handleDragMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -47,6 +50,24 @@ export function TitleBar({ onNewTab, onOpenSettings }: TitleBarProps) {
       </div>
 
       {/* PowerShell panel button */}
+      <button
+        onClick={onOpenPalette}
+        title="Command palette (Ctrl+Shift+P)"
+        className="flex items-center justify-center w-8 h-8 mr-1 rounded transition-all shrink-0 text-text-muted hover:text-text-primary hover:bg-bg-hover"
+      >
+        <Command size={14} />
+      </button>
+
+      <button
+        onClick={onTogglePortDashboard}
+        title="Port forwards dashboard"
+        className={`flex items-center justify-center w-8 h-8 mr-1 rounded transition-all shrink-0 ${
+          portDashboardOpen ? "bg-accent-purple/20 text-accent-purple" : "text-text-muted hover:text-accent-purple hover:bg-accent-purple/10"
+        }`}
+      >
+        <ArrowRightLeft size={14} />
+      </button>
+
       <button
         onClick={toggleLocalPanel}
         title="Local PowerShell (Ctrl+`)"
