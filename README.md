@@ -61,14 +61,15 @@
 | 📁 **SFTP** | Двухпанельный файловый менеджер: upload/download, mkdir/delete/rename |
 | 🔀 **Проброс портов** | Форвардинг `localhost:port` → удалённый хост, сканирование сервисов и форвард в один клик |
 | 📡 **Ping** | Round-trip latency активного подключения в статус-баре |
+| 📋 **Копирование** | Выделение в терминале + `Ctrl+Shift+C` копирует в буфер обмена |
 | 🎨 **Темы** | Темы терминала, размер шрифта, настраиваемые хоткеи |
 
 ### 📦 Установка
 
 Скачай последнюю сборку в разделе **[Releases](https://github.com/toggiho/TmarTerminal/releases/latest)**:
 
-- `TmarTerminal_0.3.0_x64-setup.exe` — Windows installer (рекомендуется).
-- `TmarTerminal_0.3.0_x64_en-US.msi` — MSI installer.
+- `TmarTerminal_0.3.1_x64-setup.exe` — Windows installer (рекомендуется).
+- `TmarTerminal_0.3.1_x64_en-US.msi` — MSI installer.
 
 ### 🛠️ Разработка
 
@@ -110,14 +111,15 @@ npm run tauri build
 | 📁 **SFTP** | Dual-pane file manager: upload/download, mkdir/delete/rename |
 | 🔀 **Port forwarding** | Forward `localhost:port` to a remote host, scan listening services, forward in one click |
 | 📡 **Ping** | Active connection round-trip latency in the status bar |
+| 📋 **Copy** | Select text in the terminal and press `Ctrl+Shift+C` to copy |
 | 🎨 **Themes** | Terminal themes, font size, configurable hotkeys |
 
 ### 📦 Install
 
 Download the latest build from **[Releases](https://github.com/toggiho/TmarTerminal/releases/latest)**:
 
-- `TmarTerminal_0.3.0_x64-setup.exe` — Windows installer (recommended).
-- `TmarTerminal_0.3.0_x64_en-US.msi` — MSI installer.
+- `TmarTerminal_0.3.1_x64-setup.exe` — Windows installer (recommended).
+- `TmarTerminal_0.3.1_x64_en-US.msi` — MSI installer.
 
 ### 🛠️ Development
 
@@ -159,14 +161,15 @@ npm run tauri build
 | 📁 **SFTP** | 双面板文件管理：上传/下载、创建目录、删除、重命名 |
 | 🔀 **端口转发** | 将 `localhost:port` 转发到远程主机，扫描监听服务并一键转发 |
 | 📡 **Ping** | 状态栏显示当前连接的往返延迟 |
+| 📋 **复制** | 在终端中选择文本，按 `Ctrl+Shift+C` 复制到剪贴板 |
 | 🎨 **主题** | 终端主题、字体大小、可配置快捷键 |
 
 ### 📦 安装
 
 请在 **[Releases](https://github.com/toggiho/TmarTerminal/releases/latest)** 页面下载最新版本：
 
-- `TmarTerminal_0.3.0_x64-setup.exe` — Windows 安装器（推荐）。
-- `TmarTerminal_0.3.0_x64_en-US.msi` — MSI 安装器。
+- `TmarTerminal_0.3.1_x64-setup.exe` — Windows 安装器（推荐）。
+- `TmarTerminal_0.3.1_x64_en-US.msi` — MSI 安装器。
 
 ### 🛠️ 开发
 
