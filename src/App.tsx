@@ -126,7 +126,7 @@ export default function App() {
   const [portForwardSessionId, setPortForwardSessionId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
-  const [portDashboardOpen, setPortDashboardOpen] = useState(true);
+  const [portDashboardOpen, setPortDashboardOpen] = useState(false);
 
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId),
@@ -532,7 +532,7 @@ export default function App() {
         }}
         onMouseDown={() => setActivePane(tab.id, pane.id)}
       >
-        <div className="absolute inset-x-0 top-0 z-10 flex h-7 items-center gap-2 border-b border-border/70 bg-bg-surface/90 px-2 text-[11px] backdrop-blur-sm">
+        <div className="absolute inset-x-0 top-0 z-10 flex h-7 items-center gap-2 border-b border-border/70 bg-bg-surface px-2 text-[11px]">
           <span className={`h-1.5 w-1.5 rounded-full ${
             pane.status === "connected" ? "bg-success" :
             pane.status === "connecting" ? "bg-warning animate-pulse" :
@@ -617,37 +617,51 @@ export default function App() {
           onReconnect={handleReconnect}
         />
 
-        <main className="relative flex-1 min-w-0 bg-bg-base">
-          {tabs.map((tab) => (
-            <div
-              key={tab.id}
-              className={`absolute inset-0 ${tab.id === activeTabId ? "block" : "hidden"}`}
-            >
-              {(tab.maximizedPaneId
-                ? getPaneRects({ type: "leaf", paneId: tab.maximizedPaneId })
-                : getPaneRects(tab.layout)
-              ).map((rect) => {
-                const pane = tab.panes.find((item) => item.id === rect.paneId);
-                return pane ? renderPane(tab, pane, rect) : null;
-              })}
-            </div>
-          ))}
+        {/* Content region: stable bounds between sidebar and window edge */}
+        <div className="relative flex-1 min-w-0 bg-bg-base">
+          {/* Background layer: fixed-size welcome, never reflows, just gets covered by panels */}
           {tabs.length === 0 && (
-            <WelcomeScreen
-              onNewConnection={() => openModal()}
-              recentConnections={recentConnections}
-              onReconnect={handleReconnect}
-            />
+            <div className="pointer-events-none absolute inset-0 z-0 flex items-center justify-center overflow-hidden">
+              <div className="pointer-events-auto">
+                <WelcomeScreen
+                  onNewConnection={() => openModal()}
+                  recentConnections={recentConnections}
+                  onReconnect={handleReconnect}
+                />
+              </div>
+            </div>
           )}
-        </main>
 
-        {portDashboardOpen && (
-          <PortForwardDashboard forwards={portForwards} onRefresh={() => refreshPortForwards().catch(console.error)} />
-        )}
+          {/* Foreground layer: terminal tabs + side panels */}
+          <div className={`relative z-10 flex h-full w-full ${tabs.length === 0 ? "pointer-events-none" : ""}`}>
+            <main className="relative flex-1 min-w-0">
+              {tabs.map((tab) => (
+                <div
+                  key={tab.id}
+                  className={`absolute inset-0 ${tab.id === activeTabId ? "block" : "hidden"}`}
+                >
+                  {(tab.maximizedPaneId
+                    ? getPaneRects({ type: "leaf", paneId: tab.maximizedPaneId })
+                    : getPaneRects(tab.layout)
+                  ).map((rect) => {
+                    const pane = tab.panes.find((item) => item.id === rect.paneId);
+                    return pane ? renderPane(tab, pane, rect) : null;
+                  })}
+                </div>
+              ))}
+            </main>
 
-        <AnimatePresence>
-          {localPanelOpen && <LocalPanel key="local-panel" />}
-        </AnimatePresence>
+            <div className="pointer-events-auto flex h-full shrink-0">
+              {portDashboardOpen && (
+                <PortForwardDashboard forwards={portForwards} onRefresh={() => refreshPortForwards().catch(console.error)} />
+              )}
+
+              <AnimatePresence>
+                {localPanelOpen && <LocalPanel key="local-panel" />}
+              </AnimatePresence>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div className="flex h-6 shrink-0 items-center border-t border-border bg-bg-surface px-4">

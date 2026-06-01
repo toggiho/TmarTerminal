@@ -17,7 +17,7 @@ const shortcuts = [
 
 export function WelcomeScreen({ onNewConnection, recentConnections, onReconnect }: WelcomeScreenProps) {
   return (
-    <div className="flex flex-col items-center justify-center h-full text-center gap-8 p-8">
+    <div className="flex w-[440px] max-w-full flex-col items-center text-center gap-8 p-8">
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}

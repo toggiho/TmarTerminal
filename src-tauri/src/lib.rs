@@ -475,6 +475,7 @@ pub fn run() {
     let saved = load_connections();
 
     tauri::Builder::default()
+        .plugin(tauri_plugin_clipboard_manager::init())
         .manage(AppState {
             ssh: Arc::new(SshManager::new()),
             pty: Arc::new(PtyManager::new()),

@@ -84,7 +84,7 @@ export function CommandPalette({ open, actions, onClose }: CommandPaletteProps) 
 
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center pt-[12vh] px-4" data-hotkeys="ignore">
-      <div className="absolute inset-0 bg-black/55 backdrop-blur-sm" onClick={onClose} />
+      <div className="absolute inset-0 bg-black/70" onClick={onClose} />
       <div className="relative w-full max-w-2xl overflow-hidden rounded-2xl border border-border bg-bg-surface shadow-2xl">
         <div className="flex items-center gap-3 border-b border-border px-4 py-3">
           <Search size={16} className="text-text-muted" />

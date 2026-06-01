@@ -48,11 +48,6 @@ body,
   display: none;
 }
 
-/* xterm.js terminal container */
-.xterm-viewport {
-  background: transparent !important;
-}
-
 /* Smooth focus transitions */
 input {
   -webkit-user-select: text;

@@ -5,6 +5,7 @@ import { WebLinksAddon } from "@xterm/addon-web-links";
 import { SearchAddon } from "@xterm/addon-search";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, UnlistenFn } from "@tauri-apps/api/event";
+import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { useStore } from "../store/useStore";
 import { TERMINAL_THEMES } from "../settings";
 import "@xterm/xterm/css/xterm.css";
@@ -15,6 +16,40 @@ interface TerminalProps {
   paneId: string;
   isActive: boolean;
   type: "ssh" | "local";
+}
+
+async function copyToClipboard(text: string) {
+  // Native Tauri clipboard — reliable in WebView2 where navigator.clipboard is often blocked
+  try {
+    await writeText(text);
+    return;
+  } catch {
+    // fall through to browser fallbacks
+  }
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+  } catch {
+    // navigator.clipboard can be blocked/unavailable — fall through
+  }
+  try {
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.top = "0";
+    ta.style.left = "0";
+    ta.style.opacity = "0";
+    ta.style.pointerEvents = "none";
+    document.body.appendChild(ta);
+    ta.focus();
+    ta.select();
+    document.execCommand("copy");
+    document.body.removeChild(ta);
+  } catch {
+    // best effort
+  }
 }
 
 export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalProps) {
@@ -34,11 +69,13 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
 
   const handleResize = useCallback(() => {
     if (!fitAddonRef.current || !xtermRef.current) return;
-    try {
-      fitAddonRef.current.fit();
-      const { cols, rows } = xtermRef.current;
-      invoke(resizeCmd, { sessionId, cols, rows }).catch(() => {});
-    } catch {}
+    requestAnimationFrame(() => {
+      try {
+        fitAddonRef.current?.fit();
+        const term = xtermRef.current;
+        if (term) invoke(resizeCmd, { sessionId, cols: term.cols, rows: term.rows }).catch(() => {});
+      } catch {}
+    });
   }, [sessionId, resizeCmd]);
 
   useEffect(() => {
@@ -52,7 +89,7 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
       cursorBlink: true,
       cursorStyle: "block",
       scrollback: 10000,
-      allowTransparency: true,
+      allowTransparency: false,
     });
 
     const fitAddon = new FitAddon();
@@ -70,6 +107,22 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
     term.onData((data) => {
       const encoded = Array.from(new TextEncoder().encode(data));
       invoke(sendCmd, { sessionId, data: encoded }).catch(() => {});
+    });
+
+    term.attachCustomKeyEventHandler((e) => {
+      if (
+        e.type === "keydown" &&
+        e.ctrlKey &&
+        e.shiftKey &&
+        (e.code === "KeyC" || e.key.toLowerCase() === "c")
+      ) {
+        const selection = term.getSelection();
+        if (selection) {
+          copyToClipboard(selection);
+          return false;
+        }
+      }
+      return true;
     });
 
     const setup = async () => {
@@ -120,5 +173,9 @@ export function Terminal({ sessionId, tabId, paneId, isActive, type }: TerminalP
     }
   }, [isActive, handleResize]);
 
-  return <div ref={containerRef} className="w-full h-full" style={{ padding: "4px 8px" }} />;
+  return (
+    <div className="w-full h-full" style={{ padding: "4px 8px" }}>
+      <div ref={containerRef} className="w-full h-full" />
+    </div>
+  );
 }
