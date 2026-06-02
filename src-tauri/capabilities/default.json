@@ -11,6 +11,8 @@
     "core:window:allow-close",
     "core:window:allow-is-maximized",
     "clipboard-manager:allow-write-text",
-    "clipboard-manager:allow-read-text"
+    "clipboard-manager:allow-read-text",
+    "updater:default",
+    "process:default"
   ]
 }

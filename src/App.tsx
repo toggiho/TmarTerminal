@@ -14,7 +14,9 @@ import { PortForwardModal } from "./components/PortForwardModal";
 import { SettingsModal } from "./components/SettingsModal";
 import { CommandPalette, CommandPaletteAction } from "./components/CommandPalette";
 import { PortForwardDashboard } from "./components/PortForwardDashboard";
+import { UpdateModal } from "./components/UpdateModal";
 import { useStore } from "./store/useStore";
+import { useUpdater } from "./hooks/useUpdater";
 import { ConnectFormData, PortForwardRecord, RecentConnection, SavedConnection, Tab, TerminalPane } from "./types";
 import { v4 } from "./utils/uuid";
 import { isHotkey } from "./settings";
@@ -127,6 +129,8 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [portDashboardOpen, setPortDashboardOpen] = useState(false);
+  const [updateModalOpen, setUpdateModalOpen] = useState(false);
+  const updater = useUpdater();
 
   const activeTab = useMemo(
     () => tabs.find((tab) => tab.id === activeTabId),
@@ -606,7 +610,10 @@ export default function App() {
         onOpenSettings={() => setSettingsOpen(true)}
         onOpenPalette={() => setPaletteOpen(true)}
         onTogglePortDashboard={() => setPortDashboardOpen((value) => !value)}
+        onOpenUpdate={() => setUpdateModalOpen(true)}
         portDashboardOpen={portDashboardOpen}
+        updateAvailable={updater.status === "available" || updater.status === "downloading" || updater.status === "installing"}
+        updateVersion={updater.update?.version}
       />
 
       <div className="flex min-h-0 flex-1">
@@ -733,6 +740,7 @@ export default function App() {
 
       <SettingsModal open={settingsOpen} onClose={() => setSettingsOpen(false)} />
       <CommandPalette open={paletteOpen} actions={paletteActions} onClose={() => setPaletteOpen(false)} />
+      <UpdateModal open={updateModalOpen} updater={updater} onClose={() => setUpdateModalOpen(false)} />
 
       <ConnectModal
         open={modalOpen}

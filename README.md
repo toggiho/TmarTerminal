@@ -68,8 +68,8 @@
 
 Скачай последнюю сборку в разделе **[Releases](https://github.com/toggiho/TmarTerminal/releases/latest)**:
 
-- `TmarTerminal_0.3.1_x64-setup.exe` — Windows installer (рекомендуется).
-- `TmarTerminal_0.3.1_x64_en-US.msi` — MSI installer.
+- `TmarTerminal_0.3.2_x64-setup.exe` — Windows installer (рекомендуется).
+- `TmarTerminal_0.3.2_x64_en-US.msi` — MSI installer.
 
 ### 🛠️ Разработка
 
@@ -118,8 +118,8 @@ npm run tauri build
 
 Download the latest build from **[Releases](https://github.com/toggiho/TmarTerminal/releases/latest)**:
 
-- `TmarTerminal_0.3.1_x64-setup.exe` — Windows installer (recommended).
-- `TmarTerminal_0.3.1_x64_en-US.msi` — MSI installer.
+- `TmarTerminal_0.3.2_x64-setup.exe` — Windows installer (recommended).
+- `TmarTerminal_0.3.2_x64_en-US.msi` — MSI installer.
 
 ### 🛠️ Development
 
@@ -141,6 +141,8 @@ npm run build
 cd src-tauri; cargo check; cd ..
 npm run tauri build
 ```
+
+Native updater releases require signing keys and GitHub release artifacts. See [`docs/UPDATER.md`](docs/UPDATER.md) before publishing a tagged release.
 
 > Saved connections are stored in the user's config directory under `TmarTerminal/connections.json`. That file is not part of the repository.
 
@@ -168,8 +170,8 @@ npm run tauri build
 
 请在 **[Releases](https://github.com/toggiho/TmarTerminal/releases/latest)** 页面下载最新版本：
 
-- `TmarTerminal_0.3.1_x64-setup.exe` — Windows 安装器（推荐）。
-- `TmarTerminal_0.3.1_x64_en-US.msi` — MSI 安装器。
+- `TmarTerminal_0.3.2_x64-setup.exe` — Windows 安装器（推荐）。
+- `TmarTerminal_0.3.2_x64_en-US.msi` — MSI 安装器。
 
 ### 🛠️ 开发
 

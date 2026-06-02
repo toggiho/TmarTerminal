@@ -1,5 +1,5 @@
 import { getCurrentWindow } from "@tauri-apps/api/window";
-import { Minus, Square, X, LayoutPanelLeft, TerminalSquare, Settings, Command, ArrowRightLeft } from "lucide-react";
+import { Minus, Square, X, LayoutPanelLeft, TerminalSquare, Settings, Command, ArrowRightLeft, DownloadCloud } from "lucide-react";
 import { useCallback } from "react";
 import { TabBar } from "./TabBar";
 import { useStore } from "../store/useStore";
@@ -9,10 +9,22 @@ interface TitleBarProps {
   onOpenSettings: () => void;
   onOpenPalette: () => void;
   onTogglePortDashboard: () => void;
+  onOpenUpdate: () => void;
   portDashboardOpen: boolean;
+  updateAvailable: boolean;
+  updateVersion?: string;
 }
 
-export function TitleBar({ onNewTab, onOpenSettings, onOpenPalette, onTogglePortDashboard, portDashboardOpen }: TitleBarProps) {
+export function TitleBar({
+  onNewTab,
+  onOpenSettings,
+  onOpenPalette,
+  onTogglePortDashboard,
+  onOpenUpdate,
+  portDashboardOpen,
+  updateAvailable,
+  updateVersion,
+}: TitleBarProps) {
   const { toggleSidebar, toggleLocalPanel, localPanelOpen } = useStore();
 
   const handleDragMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
@@ -88,6 +100,17 @@ export function TitleBar({ onNewTab, onOpenSettings, onOpenPalette, onTogglePort
       >
         <Settings size={14} />
       </button>
+
+      {updateAvailable && (
+        <button
+          onClick={onOpenUpdate}
+          title={updateVersion ? `Update available: ${updateVersion}` : "Update available"}
+          className="relative mr-1 flex h-8 w-8 shrink-0 items-center justify-center rounded text-accent-cyan transition-all hover:bg-accent-cyan/10 hover:text-accent-cyan-light"
+        >
+          <DownloadCloud size={15} />
+          <span className="absolute right-1.5 top-1.5 h-2 w-2 rounded-full bg-warning shadow-[0_0_10px_rgba(210,153,34,0.8)]" />
+        </button>
+      )}
 
       {/* Window controls */}
       <div className="flex items-center shrink-0">

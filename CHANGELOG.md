@@ -5,6 +5,17 @@ All notable changes to TmarTerminal are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.2] - 2026-06-02
+
+### Added
+- **Native updater.** TmarTerminal now checks GitHub Releases in the background,
+  shows an update indicator in the title bar, displays release notes, and can
+  install signed updates through the native Tauri updater.
+
+### Changed
+- **Release automation.** GitHub Actions now builds signed Windows release
+  artifacts and publishes the updater `latest.json` file for future versions.
+
 ## [0.3.0] - 2026-06-01
 
 ### Added
@@ -56,3 +67,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 [0.2.0]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.2.0
 [0.1.0]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.1.0
 [0.3.0]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.3.0
+[0.3.2]: https://github.com/toggiho/TmarTerminal/releases/tag/v0.3.2
